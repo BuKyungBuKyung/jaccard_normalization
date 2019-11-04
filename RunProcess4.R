@@ -6,20 +6,27 @@ library(sctransform)
 library(SCnorm)
 library(scran)
 library(cluster)
+library(biomaRt)
 sourceCpp('/home/node01/seurat normalization test/scaling2.cpp')
 sourceCpp('/home/node01/seurat normalization test/neighbors.cpp')
+source('/home/node01/seurat normalization test/scalingfactor_4.R')
+
+
+
+
 
 #generate data
-a<-read.table('/home/node01/seurat normalization test/data/Single-cell datasets-20191028T005513Z-001/Single-cell datasets/xin.txt')
-b<-a[2:nrow(a),2:ncol(a)]
-rownames(b)<-a[2:nrow(a),1]
-colnames(b)<-as.character(unlist(a[1,2:ncol(a)]))
-countdata<-b
-
-label<-read.csv('/home/node01/seurat normalization test/data/Single-cell datasets-20191028T005513Z-001/Single-cell datasets/xin-labels.csv')
+a<-read.table('/home/node01/seurat normalization test/data/transformed/raw/xin_transformed.txt',stringsAsFactors = FALSE)
+countdata<-a
+label<-read.table('/home/node01/seurat normalization test/data/transformed/raw/xin_labels.txt',stringsAsFactors = FALSE)
 label=as.character(label[,1])
 
+# If data is raw_count
+# compare the number of genes with gene length in grch37 archive and grch38 and automatically choose the db with higher number of common genes.
+# You can manually assign version(37 or 38)
+ensembl<-findmart(countdata, species='human', vers=NULL)
 
+                                
 
 
 # 
@@ -58,7 +65,9 @@ tsne_res<-vector()
 umap_res<-vector()
 pca_res<-vector()
 rname<-vector()
+
 #for other previous methods
+#cell scaling 할때만 biomart를 사용해줬습니다.
 for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
   project<-processtoseurat(countdata = countdata, projectname = 'xin_pancreas', norm.method=norm.methods, neighbor.method = 'No jaccard', jaccard_qthreshold = 'none', scaled='none')
   project<-runFinal(project,npcs=30)
@@ -83,7 +92,7 @@ for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
 for(iter in c(1,3,5)){
   for(neighbor.method in c('jaccard', "generalized_jaccard")){
     for(jaccard_qthreshold in c(0.25,0.5,0.75,0.85)){
-      project<-processtoseurat(countdata = countdata, projectname = 'xin_pancreas', norm.method='cellscaling', neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled='none', iterator = iter)
+      project<-processtoseurat(countdata = countdata, projectname = 'xin_pancreas', norm.method='cellscaling', neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled='none', iterator = iter, mart=ensembl)
       project<-runFinal(project,npcs=30)
       
       # if you have cell pre-annotation vector
@@ -151,7 +160,7 @@ write.table(yanE, file ="/home/node01/seurat normalization test/result/xinP.csv"
 
 
 
-processtoseurat<-function(countdata, projectname='yan_embryo', norm.method='cellscaling', neighbor.method='jaccard', jaccard_qthreshold=0.3, scaled='none', iterator=1){
+processtoseurat<-function(countdata, projectname='yan_embryo', norm.method='cellscaling', neighbor.method='jaccard', jaccard_qthreshold=0.3, scaled='none', iterator=1, mart=NULL){
   if(norm.method == 'scran'){
     
     tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
@@ -178,11 +187,11 @@ processtoseurat<-function(countdata, projectname='yan_embryo', norm.method='cell
     project<-normalization(project, method=norm.method, neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, logcount=F, scaled=scaled)
     project@misc$cutoutcells<-tempproject@misc$cutoutcells
   }else{
-    
     project<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
-    project<-preprocess(project, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
-    #혹시 preprocess 진행하면 잘려나간 cell들의 index를 확인하고 cell pre annotation vector에서 제거해줘야합니다. processed=F면 preprocess진행됩니다.
-    project<-normalization(project, method=norm.method, scaled=scaled, neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
+    project<-preprocess(project, processed=F)
+    #혹시 preprocess 진행하면 잘려나간 cell들의 index를 확인하고 cell pre annotation vector에서 제거해주도록했습니다. 이 index는 project@misc에 넣었습니다. processed=F면 preprocess진행됩니다.
+
+    project<-normalization(project, method=norm.method, scaled=scaled, neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator, mart=mart) 
   }
   return(project)
 }
@@ -214,7 +223,7 @@ preprocess<-function(project, processed=F){
 # method=c('lognormalize','cellscaling','none)
 # scaled=c('none', 'UMI', 'RPKM', 'TPM', 'FPKM')
 # iterator is only for jaccard cell scaling
-normalization<-function(project, scaled='none', method='lognormalize', neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1){
+normalization<-function(project, scaled='none', method='lognormalize', neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1, mart=NULL){
   
   if(method=='scran'){
     logcount=T
@@ -230,14 +239,23 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
   }else if(method=='cellscaling'){
     countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
     count_normalizing<-countunnorm
+    if(scaled=='none'){
+      g_inter<-intersect(rownames(count_normalizing), mart$external_gene_name)
+      inter_m_index<-match(g_inter,mart$external_gene_name)
+      mart<-mart[inter_m_index,]
+      count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing))]
+      count_normalizing<-(count_normalizing*(10^3))/mart$external_gene_name
+      
+    }
+    libsize<-colSums(count_normalizing)
     for(i in 1:iterator){
-      libsize<-colSums(count_normalizing)
-      if(scaled%in%c('UMI','RPKM','TPM','FPKM')){
+      
+      if(scaled%in%c('UMI','RPKM','TPM','FPKM','RPM')){
         jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
         jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
         neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
         norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
-      }else{
+      }else if(scaled=='none'){
         #raw count를 계산해야하는데 gene length등이 필요해서... biomart로 불러올생각이에요. 미완성파트입니다.
         jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
         jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
@@ -245,12 +263,11 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
         norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
       }
       count_normalizing<-t(t(count_normalizing)*(norm.factor))
-      if(scaled%in%c('RPKM','TPM','FPKM', 'RPM')){
-      }else{
-        count_normalizing<-t(t(count_normalizing)/(libsize))
-        count_normalizing<-count_normalizing*10^4
-        scaled<-'RPM'
-      }
+    }
+    if(scaled%in%c('RPKM','TPM','FPKM', 'RPM')){
+    }else{
+      count_normalizing<-t(t(count_normalizing)/(libsize))
+      count_normalizing<-count_normalizing*10^4
     }
     countnorm<-log1p(countnorm)
     
@@ -271,36 +288,7 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
   }
   return(project)
 }
-# 
-# counts1<-as.matrix(GetAssayData(object = project, slot='counts'))
-# data1<-as.matrix(GetAssayData(object = project, slot='data'))
-# iter1<-count_normalizing
-# 
-# counts3<-as.matrix(GetAssayData(object = project, slot='counts'))
-# data3<-as.matrix(GetAssayData(object = project, slot='data'))
-# iter3<-count_normalizing
-# 
-# 
-# 
-# prj3<-project
-# 
-# prj3<-SetAssayData(object=project, slot='data', new.data = data3)
-# prj1<-SetAssayData(object=project, slot='data', new.data = data1)
-# 
-# (GetAssayData(object = prj1, slot='data'))[1:10,1:10]
-# (GetAssayData(object = prj3, slot='data'))[1:10,1:10]
-# 
-# confirm5<-as(object=confirm5, Class='dgCmatrix')
-# confirm5[1:10,1:10]
-# 
-# 
-# prj1<-runFinal(prj1,npcs=30)
-# prj3<-runFinal(prj3,npcs = 30)
-# Result(prj1, cellannot=cellannotation)
-# Result(prj3, cellannot=cellannotation)
-# 
-# prj3@reductions$pca@cell.embeddings[1:10,1:10]
-# prj1@reductions$pca@cell.embeddings[1:10,1:10]
+
 
 
 
@@ -340,6 +328,46 @@ Result<-function(project, jaccard_qthreshold=0.3, cellannot=NULL, norm.method='c
   return(silscore)
 }
 
+findmart<-function(countdata, species, vers=NULL){
+  dataset<-switch(species, 'mouse'="hsapiens_gene_ensembl", 'mouse'='mmusculus_gene_ensembl')
+  if(is.null(vers)){
+    ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
+    ensembl38<-useMart('ensembl', dataset=dataset)
+    ensembl37 <-getBM(mart=ensembl37,attributes = c('external_gene_name','start_position','end_position'))
+    ensembl38 <-getBM(mart=ensembl38,attributes = c('external_gene_name','start_position','end_position'))
+    #if annotated gene names have more common in grch37, return ensembl dataset from grch37 annotation  
+    
+    if(length(intersect(rownames(countdata),ensembl37$external_gene_name))>length(intersect(rownames(countdata),ensembl38$external_gene_name))){
+      ensembl<-ensembl37
+    }else{
+      ensembl<-ensembl38
+    }
+  }else if(vers==37){
+    ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
+    ensembl37 <-getBM(mart=ensembl37,attributes = c('external_gene_name','start_position','end_position'))
+    ensembl<-ensembl37
+  }else if(vers==38){
+    ensembl38<-useMart('ensembl', dataset=dataset)
+    ensembl38 <-getBM(mart=ensembl38,attributes = c('external_gene_name','start_position','end_position'))
+    ensembl<-ensembl38
+  }else{
+    print('unknown vers')
+    return(NULL)
+  }
+  ensembl<-ensembl[which(ensembl$start_position!="" & ensembl$end_position!=""),]
+  gene_length<-(ensembl$end_position-ensembl$start_position)+1
+  ensembl <-cbind(ensembl,gene_length)
+  ensembl<-ensembl[,c(1,4)]
+  ensembl_max<-vector()
+  for(i in unique(ensembl$external_gene_name)){
+    ind<-which(ensembl$external_gene_name==i)
+    ensembl_max<-append(ensembl_max, max(ensembl$gene_length[ind]))
+  }
+  ensembl_ind<-match(unique(ensembl$external_gene_name),ensembl$external_gene_name)
+  ensembl<-ensembl[ensembl_ind,]
+  ensembl$gene_length<-ensembl_max
+  return(ensembl)
+}
 
 
 # Result<-function(project, jaccard_qthreshold=0.3, cellannot=NULL){
