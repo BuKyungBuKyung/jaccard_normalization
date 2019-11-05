@@ -244,7 +244,7 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       inter_m_index<-match(g_inter,mart$external_gene_name)
       mart<-mart[inter_m_index,]
       count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing))]
-      count_normalizing<-(count_normalizing*(10^3))/mart$external_gene_name
+      count_normalizing<-(count_normalizing*(10^3))/mart$gene_length
       
     }
     libsize<-colSums(count_normalizing)
