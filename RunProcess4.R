@@ -89,9 +89,9 @@ for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
                                                                                                                                         
 
 #for cell scaling so as to test various jaccard qthreshold
-for(iter in c(1,3,5)){
-  for(neighbor.method in c('jaccard', "generalized_jaccard")){
-    for(jaccard_qthreshold in c(0.25,0.5,0.75,0.85)){
+for(iter in c(1)){
+  for(neighbor.method in c('jaccard')){
+    for(jaccard_qthreshold in c(0.25)){
       project<-processtoseurat(countdata = countdata, projectname = 'xin_pancreas', norm.method='cellscaling', neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled='none', iterator = iter, mart=ensembl)
       project<-runFinal(project,npcs=30)
       
@@ -111,9 +111,6 @@ for(iter in c(1,3,5)){
     }
   }
 }
-
-
-
 
 
 
@@ -160,16 +157,20 @@ write.table(yanE, file ="/home/node01/seurat normalization test/result/xinP.csv"
 
 
 
-processtoseurat<-function(countdata, projectname='yan_embryo', norm.method='cellscaling', neighbor.method='jaccard', jaccard_qthreshold=0.3, scaled='none', iterator=1, mart=NULL){
+processtoseurat<-function(countdata, projectname='xin_p', norm.method='cellscaling', neighbor.method='jaccard', jaccard_qthreshold=0.3, scaled='none', iterator=1, mart=NULL){
   if(norm.method == 'scran'){
     
     tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
     tempproject<-preprocess(tempproject, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
     sce <- SingleCellExperiment(list(counts=as.matrix(GetAssayData(object = tempproject, slot='counts'))))
     sce <- normalize(sce)
+    logcounts<-sce@assays$data$logcounts
+    logcounts<-log1p(2^logcounts)
+    sce@assays$data$logcounts<-logcounts
     project<-as.Seurat(sce, counts = "counts", data = "logcounts")
     project@project.name=projectname
     project@misc$cutoutcells<-tempproject@misc$cutoutcells
+    
   }else if(norm.method == 'sctransform'){
     project<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
     project<-preprocess(project, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
@@ -224,7 +225,6 @@ preprocess<-function(project, processed=F){
 # scaled=c('none', 'UMI', 'RPKM', 'TPM', 'FPKM')
 # iterator is only for jaccard cell scaling
 normalization<-function(project, scaled='none', method='lognormalize', neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1, mart=NULL){
-  
   if(method=='scran'){
     logcount=T
   }
@@ -241,22 +241,24 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
     count_normalizing<-countunnorm
     libsize<-colSums(count_normalizing)
     if(scaled=='none'){
+      
       g_inter<-intersect(rownames(count_normalizing), mart$external_gene_name)
       inter_m_index<-match(g_inter,mart$external_gene_name)
       mart<-mart[inter_m_index,]
       count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing)),]
+      cutoutcells<-project@misc$cutoutcells
+      project <- CreateSeuratObject(count_normalizing)
+      project@misc$cutoutcells<-cutoutcells
       count_normalizing<-(count_normalizing*(10^3))/mart$gene_length
       
     }
     for(i in 1:iterator){
-      
       if(scaled%in%c('UMI','RPKM','TPM','FPKM','RPM')){
         jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
         jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
         neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
         norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
       }else if(scaled=='none'){
-        #raw count를 계산해야하는데 gene length등이 필요해서... biomart로 불러올생각이에요. 미완성파트입니다.
         jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
         jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
         neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
@@ -289,6 +291,20 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
   return(project)
 }
 
+
+double_normalization<-function(project, scaled='none', first.method='lognormalize', second.neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1, mart=NULL){
+  if(method=='scran'){
+    logcount=T
+  }
+  if(method=='lognormalize'){
+    if(scaled %in% c('RPKM','TPM','FPKM', 'RPM')){
+      countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
+      countnorm<-log1p(countunnorm)
+      project<-SetAssayData(object=project, slot='data', new.data = countnorm)
+    }else{
+      NormalizeData(object = project, normalization.method = "LogNormalize", scale.factor = 10000)
+    }
+}
 
 
 
@@ -329,7 +345,7 @@ Result<-function(project, jaccard_qthreshold=0.3, cellannot=NULL, norm.method='c
 }
 
 findmart<-function(countdata, species, vers=NULL){
-  dataset<-switch(species, 'mouse'="hsapiens_gene_ensembl", 'mouse'='mmusculus_gene_ensembl')
+  dataset<-switch(species, 'human'="hsapiens_gene_ensembl", 'mouse'='mmusculus_gene_ensembl')
   if(is.null(vers)){
     ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
     ensembl38<-useMart('ensembl', dataset=dataset)
