@@ -239,15 +239,15 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
   }else if(method=='cellscaling'){
     countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
     count_normalizing<-countunnorm
+    libsize<-colSums(count_normalizing)
     if(scaled=='none'){
       g_inter<-intersect(rownames(count_normalizing), mart$external_gene_name)
       inter_m_index<-match(g_inter,mart$external_gene_name)
       mart<-mart[inter_m_index,]
-      count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing))]
+      count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing)),]
       count_normalizing<-(count_normalizing*(10^3))/mart$gene_length
       
     }
-    libsize<-colSums(count_normalizing)
     for(i in 1:iterator){
       
       if(scaled%in%c('UMI','RPKM','TPM','FPKM','RPM')){
@@ -269,7 +269,7 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       count_normalizing<-t(t(count_normalizing)/(libsize))
       count_normalizing<-count_normalizing*10^4
     }
-    countnorm<-log1p(countnorm)
+    countnorm<-log1p(count_normalizing)
     
     countnorm <- as(object = countnorm, Class = "dgCMatrix")
     project<-SetAssayData(object=project, slot='data', new.data = countnorm)
