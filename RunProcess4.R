@@ -335,32 +335,11 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
       count_normalizing<-t(t(count_normalizing)*(norm.factor))
     }
-    
-
-      if(scaled%in%c('UMI','RPKM','TPM','FPKM','RPM', 'prenorm')){
-        jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
-        jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
-        neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
-        norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
-      }else if(scaled=='none'){
-        jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
-        jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
-        neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
-        norm.factor<-scalingfactor(count_normalizing, neighbors = neighbors)
-      }
-      count_normalizing<-t(t(count_normalizing)*(norm.factor))
-    }
-    if(scaled%in%c('RPKM','TPM','FPKM', 'RPM','prenorm')){
-    }else{
-      count_normalizing<-t(t(count_normalizing)/(libsize))
-      count_normalizing<-count_normalizing*10^4
-    }
-
     countnorm<-log1p(count_normalizing)
     
     countnorm <- as(object = countnorm, Class = "dgCMatrix")
     project<-SetAssayData(object=project, slot='data', new.data = countnorm)
-    # 
+    
   }else if(logcount==T){
     countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
     countnorm <- as(object = countunnorm, Class = "dgCMatrix")
