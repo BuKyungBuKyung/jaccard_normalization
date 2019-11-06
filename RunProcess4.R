@@ -289,11 +289,6 @@ preprocess<-function(project, processed=F){
 # iterator is only for jaccard cell scaling
 normalization<-function(project, scaled='none', method='lognormalize', neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1, mart=NULL){
 
-
-  if(method=='scran'){
-    logcount=T
-  }
-
   if(method=='lognormalize'){
     if(scaled %in% c('RPKM','TPM','FPKM', 'RPM')){
       countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
