@@ -288,12 +288,12 @@ preprocess<-function(project, processed=F){
 # scaled=c('none', 'UMI', 'RPKM', 'TPM', 'FPKM')
 # iterator is only for jaccard cell scaling
 normalization<-function(project, scaled='none', method='lognormalize', neighbor.method='jaccard' , jaccard_qthreshold=0.3, logcount=FALSE, iterator=1, mart=NULL){
-<<<<<<< HEAD
-=======
+
+
   if(method=='scran'){
     logcount=T
   }
->>>>>>> 0947add95f6f33260185906ec4fec0fbd0f7e97a
+
   if(method=='lognormalize'){
     if(scaled %in% c('RPKM','TPM','FPKM', 'RPM')){
       countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
@@ -329,7 +329,6 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
     }
     
     for(i in 1:iterator){
-<<<<<<< HEAD
       jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
       jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
       neighbors<-lapply(jaccard_neighbors, function(x)which(x>jaccard_threshold))
@@ -337,7 +336,7 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       count_normalizing<-t(t(count_normalizing)*(norm.factor))
     }
     
-=======
+
       if(scaled%in%c('UMI','RPKM','TPM','FPKM','RPM', 'prenorm')){
         jaccard_neighbors<-jac_neighbors(count_normalizing, method=neighbor.method)
         jaccard_threshold=quantile(unlist(jaccard_neighbors),jaccard_qthreshold)
@@ -356,7 +355,7 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       count_normalizing<-t(t(count_normalizing)/(libsize))
       count_normalizing<-count_normalizing*10^4
     }
->>>>>>> 0947add95f6f33260185906ec4fec0fbd0f7e97a
+
     countnorm<-log1p(count_normalizing)
     
     countnorm <- as(object = countnorm, Class = "dgCMatrix")
@@ -369,10 +368,6 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
   }else{
     countunnorm<-as.matrix(GetAssayData(object = project, slot='counts'))
     countnorm<-log1p(countunnorm)
-<<<<<<< HEAD
-=======
-    
->>>>>>> 0947add95f6f33260185906ec4fec0fbd0f7e97a
     countnorm <- as(object = countnorm, Class = "dgCMatrix")
     project<-SetAssayData(object=project, slot='data', new.data = countnorm)
   }
