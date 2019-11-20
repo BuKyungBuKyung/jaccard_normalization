@@ -235,7 +235,7 @@ runFinal<-function(project, npcs=30){
 }
 
 
-Result<-function(project, jaccard_qthreshold=0.3, cellannot=NULL, norm.method='cellscaling', method='tsne', dims=2 ,iterator=1){
+Result<-function(project, result.dir, jaccard_qthreshold=0.3, cellannot=NULL, norm.method='cellscaling', method='tsne', dims=2 ,iterator=1){
   if(!is.null(cellannot)){
     project$seurat_clusters<-cellannot
     project$seurat_clusters<-factor(cellannot)
@@ -249,7 +249,7 @@ Result<-function(project, jaccard_qthreshold=0.3, cellannot=NULL, norm.method='c
   
   
   
-  png(paste('/home/node01/seurat normalization test/result/',project@project.name,norm.method,method,jaccard_qthreshold*100,'percent quantile.png',sep=' '))
+  png(paste(result.dir,project@project.name,norm.method,method,jaccard_qthreshold*100,'percent quantile.png',sep=' '))
   print(DimPlot(project, reduction = method, pt.size = 2) + labs(title=paste(project@project.name, method, sep='_')) + labs(subtitle = if(norm.method=='cellscaling_jaccard'||norm.method=='cellscaling_generalized_jaccard')paste(norm.method, iter, 'iterated' , 'jaccard threshold :', jaccard_qthreshold*100 ,'% quantile \n silhouette score :', round(silscore,digits = 4), sep=' ')else paste(norm.method ,'\n silhouette score :', round(silscore,digits = 4), sep=' ') ))
   dev.off()
   

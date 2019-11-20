@@ -15,7 +15,7 @@ source('basefunctions.R')
 
 
 
-
+res_dir='/home/node01/seurat normalization test/result/'
 #generate data
 a<-read.table('/home/node01/seurat normalization test/data/transformed/raw/xin_transformed.txt',stringsAsFactors = FALSE)
 countdata<-a
@@ -73,9 +73,9 @@ for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
   
   # jaccard_qthreshold default=0.3
   # if you don't have cell pre-annotation vector, cellannot default is null.
-  tsne_res<-append(tsne_res, Result(project, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='tsne'))
-  umap_res<-append(umap_res, Result(project, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='umap'))
-  pca_res<-append(pca_res, Result(project, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='pca', dims=30))
+  tsne_res<-append(tsne_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='tsne'))
+  umap_res<-append(umap_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='umap'))
+  pca_res<-append(pca_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=norm.methods ,jaccard_qthreshold = 0.3, method='pca', dims=30))
   rname<-append(rname, norm.methods)
 }
                                                                                                                                         
@@ -96,9 +96,9 @@ for(iter in c(1,3,5)){
       
       # jaccard_qthreshold default=0.3
       # if you don't have cell pre-annotation vector, cellannot default is null.
-      tsne_res<-append(tsne_res, Result(project, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='tsne' , iterator=iter))
-      umap_res<-append(umap_res, Result(project, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='umap' , iterator=iter))
-      pca_res<-append(pca_res, Result(project, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='pca',dims=30, iterator=iter))
+      tsne_res<-append(tsne_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='tsne' , iterator=iter))
+      umap_res<-append(umap_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='umap' , iterator=iter))
+      pca_res<-append(pca_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste('cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='pca',dims=30, iterator=iter))
       rname<-append(rname,paste(iter,'_iterated ', neighbor.method,' ', jaccard_qthreshold, 'quantile'))
     }
   }
@@ -122,9 +122,9 @@ for(iter in c(1,3,5)){
         
         # jaccard_qthreshold default=0.3
         # if you don't have cell pre-annotation vector, cellannot default is null.
-        tsne_res<-append(tsne_res, Result(project, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='tsne' , iterator=iter))
-        umap_res<-append(umap_res, Result(project, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='umap' , iterator=iter))
-        pca_res<-append(pca_res, Result(project, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='pca',dims=30, iterator=iter))
+        tsne_res<-append(tsne_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='tsne' , iterator=iter))
+        umap_res<-append(umap_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='umap' , iterator=iter))
+        pca_res<-append(pca_res, Result(project, result.dir=res_dir, cellannot = cellannotation, norm.method=paste(norm.methods,'cellscaling',neighbor.method,sep='_') ,jaccard_qthreshold = jaccard_qthreshold, method='pca',dims=30, iterator=iter))
         rname<-append(rname,paste(norm.methods, iter,'_iterated ', neighbor.method,' ', jaccard_qthreshold, 'quantile'))
       }
     }
@@ -138,7 +138,7 @@ yanE<-matrix(c(tsne_res,umap_res,pca_res),ncol=3)
 colnames(yanE)<-cname
 rownames(yanE)<-rname
 yanE<-round(yanE, digits=4)
-write.table(yanE, file ="/home/node01/seurat normalization test/result/xinP.csv",col.names = T, row.names = T )
+write.table(yanE, file =paste(res_dir,projectname,'.csv',sep=''),col.names = T, row.names = T )
 
 
 
