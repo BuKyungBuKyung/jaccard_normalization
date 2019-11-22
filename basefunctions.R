@@ -36,7 +36,6 @@ processtoseurat<-function(countdata, projectname='xin_p', norm.method='cellscali
       DataNorm<-SCnorm(Data = sce, Conditions = Conditions, PrintProgressPlots = TRUE, FilterCellNum = 10, K =1, NCores=1, reportSF = TRUE)
       project<-as.Seurat(DataNorm, counts = "normcounts", data = "normcounts")
       project@project.name=projectname
-      project<-normalization(project, method=norm.method, neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, logcount=F, scaled=scaled)
       project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
       project<-AddMetaData(object = project, metadata = tempproject$percent.mito, col.name = "percent.mito")
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
@@ -132,7 +131,8 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
       mart<-mart[inter_m_index,]
       count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing)),]
       cutoutcells<-project@misc$cutoutcells
-      project <- CreateSeuratObject(count_normalizing)
+      projectname<-project@project.name
+      project <- CreateSeuratObject(count_normalizing,project = projectname)
       project@misc$cutoutcells<-cutoutcells
       count_normalizing<-(count_normalizing*(10^3))/mart$gene_length
       count_normalizing<-t(t(count_normalizing)/(libsize))
