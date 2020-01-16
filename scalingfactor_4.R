@@ -1,5 +1,5 @@
-sourceCpp('/home/node01/seurat normalization test/neighbors.cpp')
-sourceCpp('/home/node01/seurat normalization test/scaling2.cpp')
+# sourceCpp('/home/node01/seurat normalization test/neighbors.cpp')
+# sourceCpp('/home/node01/seurat normalization test/scaling2.cpp')
 jac_neighbors<-function(obs, lib.size=NULL, method='generalized_jaccard'){ #지금은jaccard threshold가manual한값
   # obs<-countunnorm
   

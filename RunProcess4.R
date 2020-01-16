@@ -15,17 +15,17 @@ source('basefunctions.R')
 
 
 
-res_dir='/home/node01/seurat normalization test/result/'
+res_dir='/home/node00/seurat normalization test/result/'
 #generate data
-a<-read.table('/home/node01/seurat normalization test/data/transformed/raw/xin_transformed.txt',stringsAsFactors = FALSE)
+a<-read.table('/home/node00/seurat normalization test/data/transformed/rpkm/deng_transformed.txt',stringsAsFactors = FALSE)
 countdata<-a
-label<-read.table('/home/node01/seurat normalization test/data/transformed/raw/xin_labels.txt',stringsAsFactors = FALSE)
+label<-read.table('/home/node00/seurat normalization test/data/transformed/rpkm/deng_labels.txt',stringsAsFactors = FALSE)
 label=as.character(label[,1])
 
 # If data is raw_count
 # compare the number of genes with gene length in grch37 archive and grch38 and automatically choose the db with higher number of common genes.
 # You can manually assign version(37 or 38)
-ensembl<-findmart(countdata, species='human', vers=NULL)
+ensembl<-findmart(countdata, species='mouse', vers=38)
 
                                 
 
@@ -56,12 +56,12 @@ tsne_res<-vector()
 umap_res<-vector()
 pca_res<-vector()
 rname<-vector()
-projectname='xin_pancreas'
-
+projectname='deng_mouse_embryo'
+scaled='RPKM'
 #for other previous methods
 #cell scaling 할때만 biomart를 사용해줬습니다.
 for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
-  project<-processtoseurat(countdata = countdata, projectname = projectname, norm.method=norm.methods, neighbor.method = 'No jaccard', jaccard_qthreshold = 'none', scaled='none')
+  project<-processtoseurat(countdata = countdata, projectname = projectname, norm.method=norm.methods, neighbor.method = 'No jaccard', jaccard_qthreshold = 'none', scaled=scaled)
   project<-runFinal(project,npcs=30)
   
   # if you have cell pre-annotation vector
@@ -84,7 +84,8 @@ for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
 for(iter in c(1,3,5)){
   for(neighbor.method in c('jaccard', "generalized_jaccard")){
     for(jaccard_qthreshold in c(0.25,0.5,0.75,0.85)){
-      project<-processtoseurat(countdata = countdata, projectname = projectname, norm.method='cellscaling', neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled='none', iterator = iter, mart=ensembl)
+      
+      project<-processtoseurat(countdata = countdata, projectname = projectname, norm.method='cellscaling', neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled=scaled, iterator = iter, mart=ensembl)
       project<-runFinal(project,npcs=30)
       
       # if you have cell pre-annotation vector
@@ -108,7 +109,7 @@ for(iter in c(1,3,5)){
 for(iter in c(1,3,5)){
   for(neighbor.method in c('jaccard', "generalized_jaccard")){
     for(jaccard_qthreshold in c(0.25,0.5,0.75,0.85)){
-      for(norm.methods in c( 'scran','sctransform','scnorm','lognormalize')){
+      for(norm.methods in c( 'scran','sctransform','scnorm')){
         print(paste(iter, neighbor.method,jaccard_qthreshold,norm.methods,sep=' '))
         project<-processtoseurat(countdata = countdata, projectname = projectname, norm.method=norm.methods, neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, scaled='none', iterator = iter, mart=ensembl, doublenorm = T)
         project<-runFinal(project,npcs=30)

@@ -4,38 +4,35 @@ processtoseurat<-function(countdata, projectname='xin_p', norm.method='cellscali
       tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       tempproject<-preprocess(tempproject, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
       sce <- SingleCellExperiment(list(counts=as.matrix(GetAssayData(object = tempproject, slot='counts'))))
-      sce <- normalize(sce)
-      logcounts<-sce@assays$data$logcounts
+      sce <- scater::logNormCounts(sce)
+      logcounts<-logcounts(sce)
       #not log counts here
       logcounts<-2^logcounts
-      sce@assays$data$logcounts<-logcounts
-      project<-as.Seurat(sce, counts = "logcounts", data='logcounts')
-      project@project.name=projectname
+      logcounts(sce)<-logcounts
+      project<-CreateSeuratObject(counts=logcounts, project=projectname)
+      #project<-SetAssayData(object=project, slot='data', new.data = GetAssayData(project, assay = 'RNA',slot='counts'))
+      project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
       project<-AddMetaData(object = project, metadata = tempproject$percent.mito, col.name = "percent.mito")
-      project<-SetAssayData(object=project, slot='data', new.data = project@assays$RNA@counts)
-      project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
-      
     }else if(norm.method == 'sctransform'){
       
       project<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       project<-preprocess(project, processed=F) 
       tempproject<-SCTransform(project)
-      project<-CreateSeuratObject(counts = tempproject@assays$SCT@counts, project=projectname)
+      project<-CreateSeuratObject(counts =GetAssayData(tempproject, assay = 'SCT',slot='counts'), project=projectname)
       project$percent.mito<-tempproject$percent.mito
+      project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
       project<-AddMetaData(object = project, metadata = tempproject$percent.mito, col.name = "percent.mito")
-      project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
-      
       
     }else if(norm.method == 'scnorm'){
       tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       tempproject<-preprocess(tempproject, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
       sce <- SingleCellExperiment(list(counts=as.matrix(GetAssayData(object = tempproject, slot='counts'))))
-      Conditions = rep(c(1), each= ncol(sce@assays$data$counts))
+      Conditions = rep(c(1), each= ncol(counts(sce)))
       DataNorm<-SCnorm(Data = sce, Conditions = Conditions, PrintProgressPlots = TRUE, FilterCellNum = 10, K =1, NCores=1, reportSF = TRUE)
-      project<-as.Seurat(DataNorm, counts = "normcounts", data = "normcounts")
-      project@project.name=projectname
+      project<-CreateSeuratObject(counts=normcounts(DataNorm), project=projectname)
+      #project<-as.Seurat(DataNorm, counts = "normcounts", data = "normcounts")
       project<-normalization(project, method='cellscaling', scaled='prenorm', neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator) 
       project<-AddMetaData(object = project, metadata = tempproject$percent.mito, col.name = "percent.mito")
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
@@ -45,10 +42,10 @@ processtoseurat<-function(countdata, projectname='xin_p', norm.method='cellscali
       tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       tempproject<-preprocess(tempproject, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
       sce <- SingleCellExperiment(list(counts=as.matrix(GetAssayData(object = tempproject, slot='counts'))))
-      sce <- normalize(sce)
-      logcounts<-sce@assays$data$logcounts
+      sce <- scater::logNormCounts(sce)
+      logcounts<-logcounts(sce)
       logcounts<-log1p(2^logcounts)
-      sce@assays$data$logcounts<-logcounts
+      logcounts(sce)<-logcounts
       project<-as.Seurat(sce, counts = "counts", data = "logcounts")
       project@project.name=projectname
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
@@ -62,21 +59,25 @@ processtoseurat<-function(countdata, projectname='xin_p', norm.method='cellscali
       tempproject<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       tempproject<-preprocess(tempproject, processed=F) #지금 preprocess를 진행하면 preannotation vector를 수정해줘야하는데 preprocess cutoff를 모르겠어서 일단 rna level에 따른 cutoff는 제외해뒀습니다. 스텝진행하지않는것으로해뒀습니다.
       sce <- SingleCellExperiment(list(counts=as.matrix(GetAssayData(object = tempproject, slot='counts'))))
-      Conditions = rep(c(1), each= ncol(sce@assays$data$counts))
+      Conditions = rep(c(1), each= ncol(counts(sce)))
       DataNorm<-SCnorm(Data = sce, Conditions = Conditions, PrintProgressPlots = TRUE, FilterCellNum = 10, K =1, NCores=1, reportSF = TRUE)
-      project<-as.Seurat(DataNorm, counts = "normcounts", data = "normcounts")
-      project@project.name=projectname
+      project<-CreateSeuratObject(counts=normcounts(DataNorm), project=projectname)
       project<-AddMetaData(object = project, metadata = tempproject$percent.mito, col.name = "percent.mito")
       #neighbor.method='No jaccard'
       #norm.method='scnorm'
-      project<-normalization(project, method=norm.method, neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, logcount=F, scaled=scaled)
+      # project<-normalization(project, method=norm.method, neighbor.method = neighbor.method, jaccard_qthreshold = jaccard_qthreshold, logcount=F, scaled=scaled)
       project@misc$cutoutcells<-tempproject@misc$cutoutcells
     }else{
+      
       project<-CreateSeuratObject(counts=countdata, project=projectname, min.cells = 3, min.features = 200)
       project<-preprocess(project, processed=F)
       #혹시 preprocess 진행하면 잘려나간 cell들의 index를 확인하고 cell pre annotation vector에서 제거해주도록했습니다. 이 index는 project@misc에 넣었습니다. processed=F면 preprocess진행됩니다.
-      
+      cutoutcells<-project@misc$cutoutcells
+      percent.mito<-project$percent.mito
       project<-normalization(project, method=norm.method, scaled=scaled, neighbor.method=neighbor.method , jaccard_qthreshold = jaccard_qthreshold, logcount=F, iterator=iterator, mart=mart) 
+      project<-AddMetaData(object = project, metadata =percent.mito, col.name = "percent.mito")
+      project$percent.mito<-percent.mito
+      project@misc$cutoutcells<-cutoutcells
     }
   }
   return(project)
@@ -125,15 +126,13 @@ normalization<-function(project, scaled='none', method='lognormalize', neighbor.
     count_normalizing<-countunnorm
     libsize<-colSums(count_normalizing)
     if(scaled=='none'){
-      
+      print('divided with gene length from mart')
       g_inter<-intersect(rownames(count_normalizing), mart$external_gene_name)
       inter_m_index<-match(g_inter,mart$external_gene_name)
       mart<-mart[inter_m_index,]
       count_normalizing<-count_normalizing[match(g_inter, rownames(count_normalizing)),]
-      cutoutcells<-project@misc$cutoutcells
       projectname<-project@project.name
       project <- CreateSeuratObject(count_normalizing,project = projectname)
-      project@misc$cutoutcells<-cutoutcells
       count_normalizing<-(count_normalizing*(10^3))/mart$gene_length
       count_normalizing<-t(t(count_normalizing)/(libsize))
       count_normalizing<-count_normalizing*10^4
@@ -256,15 +255,61 @@ Result<-function(project, result.dir, jaccard_qthreshold=0.3, cellannot=NULL, no
   return(silscore)
 }
 
+
+findmart2<-function(countdata, species, vers=NULL){
+  dataset<-switch(species, 'human'="hsapiens_gene_ensembl", 'mouse'='mmusculus_gene_ensembl')
+  if(is.null(vers)){
+    ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
+    ensembl38<-useMart('ensembl', dataset=dataset)
+    ensembl37 <-getBM(mart=ensembl37,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    ensembl38 <-getBM(mart=ensembl38,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    #if annotated gene names have more common in grch37, return ensembl dataset from grch37 annotation
+    if(length(intersect(rownames(countdata),ensembl37$ensembl_gene_id))>length(intersect(rownames(countdata),ensembl38$ensembl_gene_name))){
+      ensembl<-ensembl37
+    }else{
+      ensembl<-ensembl38
+    }
+  }else if(vers==37){
+    ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
+    ensembl37 <-getBM(mart=ensembl37,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    ensembl<-ensembl37
+  }else if(vers==38){
+    ensembl38<-useMart('ensembl', dataset=dataset)
+    ensembl38 <-getBM(mart=ensembl38,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    ensembl<-ensembl38
+  }else if(vers=='mirror'){
+    ensemblm<-useEnsembl(biomart = "ensembl",
+                         dataset = dataset,
+                         mirror = "useast")
+    ensemblm <-getBM(mart=ensemblm,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    ensembl<-ensemblm
+  }else{
+    print('unknown vers')
+    return(NULL)
+  }
+  ensembl<-ensembl[which(ensembl$start_position!="" & ensembl$end_position!=""),]
+  gene_length<-(ensembl$end_position-ensembl$start_position)+1
+  ensembl <-cbind(ensembl,gene_length)
+  ensembl<-ensembl[,c(1,2,5)]
+  # ensembl_max<-vector()
+  # for(i in unique(ensembl$external_gene_name)){
+  #   ind<-which(ensembl$external_gene_name==i)
+  #   ensembl_max<-append(ensembl_max, max(ensembl$gene_length[ind]))
+  # }
+  # ensembl_ind<-match(unique(ensembl$external_gene_name),ensembl$external_gene_name)
+  # ensembl<-ensembl[ensembl_ind,]
+  # ensembl$gene_length<-ensembl_max
+  return(ensembl)
+}
+
 findmart<-function(countdata, species, vers=NULL){
   dataset<-switch(species, 'human'="hsapiens_gene_ensembl", 'mouse'='mmusculus_gene_ensembl')
   if(is.null(vers)){
     ensembl37<-useMart('ensembl', dataset=dataset, host='grch37.ensembl.org')
     ensembl38<-useMart('ensembl', dataset=dataset)
-    ensembl37 <-getBM(mart=ensembl37,attributes = c('external_gene_name','start_position','end_position'))
-    ensembl38 <-getBM(mart=ensembl38,attributes = c('external_gene_name','start_position','end_position'))
-    #if annotated gene names have more common in grch37, return ensembl dataset from grch37 annotation  
-    
+    ensembl37 <-getBM(mart=ensembl37,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    ensembl38 <-getBM(mart=ensembl38,attributes = c('ensembl_gene_id','external_gene_name','start_position','end_position'))
+    #if annotated gene names have more common in grch37, return ensembl dataset from grch37 annotation
     if(length(intersect(rownames(countdata),ensembl37$external_gene_name))>length(intersect(rownames(countdata),ensembl38$external_gene_name))){
       ensembl<-ensembl37
     }else{
@@ -278,6 +323,12 @@ findmart<-function(countdata, species, vers=NULL){
     ensembl38<-useMart('ensembl', dataset=dataset)
     ensembl38 <-getBM(mart=ensembl38,attributes = c('external_gene_name','start_position','end_position'))
     ensembl<-ensembl38
+  }else if(vers=='mirror'){
+    ensemblm<-useEnsembl(biomart = "ensembl",
+                         dataset = dataset,
+                         mirror = "useast")
+    ensemblm <-getBM(mart=ensemblm,attributes = c('external_gene_name','start_position','end_position'))
+    ensembl<-ensemblm
   }else{
     print('unknown vers')
     return(NULL)
